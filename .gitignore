@@ -1,0 +1,18 @@
+# 의존성 패키지
+node_modules/
+
+# 환경변수 (민감 정보 보호)
+.env
+server/.env
+
+# 빌드 결과물
+dist/
+server/dist/
+
+# SQLite DB 파일 (로컬 전용)
+server/prisma/dev.db
+server/prisma/dev.db-journal
+
+# 기타
+.DS_Store
+*.log

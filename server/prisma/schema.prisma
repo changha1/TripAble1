@@ -1,0 +1,64 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  favorites Favorite[]
+  plans     TripPlan[]
+  createdAt DateTime   @default(now())
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeId   String   // contentid
+  createdAt DateTime @default(now())
+
+  @@unique([userId, placeId])
+}
+
+model TripPlan {
+  id                 String          @id @default(uuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title              String
+  travelDate         String
+  duration           String          // 'day' | 'overnight'
+  totalVoucherAmount Int
+  totalSelfPay       Int
+  remainingBalance   Int
+  createdAt          DateTime        @default(now())
+  places             TripPlanPlace[]
+}
+
+model TripPlanPlace {
+  id         String   @id @default(uuid())
+  tripPlanId String
+  plan       TripPlan @relation(fields: [tripPlanId], references: [id], onDelete: Cascade)
+  placeId    String   // contentid
+  visitOrder Int      // 방문 순서
+  entryFee   Int      // 예상 입장료
+  selfPay    Int      // 예상 본인부담금
+}
+
+model VoucherMerchant {
+  id           String   @id @default(uuid())
+  contentId    String?  // 매칭용 관광지 ID (있을 경우)
+  voucherType  String   // 'munhwa-nuri' | etc.
+  merchantName String
+  address      String
+  tel          String?
+  latitude     Float?
+  longitude    Float?
+  status       String   // 'available' | 'conditional' | 'check' | 'unavailable'
+  verifiedDate String   // 'YYYY-MM-DD'
+  terms        String?
+}
