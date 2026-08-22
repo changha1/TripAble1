@@ -96,24 +96,6 @@ export const BENEFIT_CATALOG: BenefitDefinition[] = [
     dataStatus: 'verified',
     color: '#2563eb',
   },
-  {
-    id: 'regional-travel-support',
-    name: '지역별 관광복지 지원사업',
-    category: 'program',
-    description: '거주지와 대상에 따라 달라지는 지자체 관광지원 모집 정보를 확인하는 항목',
-    policyYear: 2026,
-    priority: 30,
-    eligibilitySummary: '지역별 공고와 모집 조건 확인 필요',
-    amount: null,
-    amountLabel: '지역별 상이',
-    usageChannel: '지자체별 신청·선정 절차',
-    sourceName: '정부24 및 거주지 지자체 공고',
-    sourceUrl: 'https://www.gov.kr/portal/main',
-    verifiedAt: '2026-08-22',
-    requiresManualCheck: true,
-    dataStatus: 'manual-check',
-    color: '#64748b',
-  },
 ];
 
 export const BENEFIT_CATEGORY_LABELS: Record<BenefitCategory, string> = {
