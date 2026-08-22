@@ -3,7 +3,7 @@ import { VoucherStatus } from '../types/index.js';
 
 export interface VoucherMerchant {
   contentId?: string;       // 한국관광공사 contentid가 식별된 경우 매칭 속도 향상
-  voucherType: string;     // 'munhwa-nuri' (문화누리카드), 'tourism-welfare' (여행이용권), 'gwandoo-re' (관광두레), 'leisure' (여가바우처)
+  voucherType: string;     // 'munhwa-nuri' | 'disabled-welfare-card' | 'worker-vacation'
   merchantName: string;    // 가맹점명
   address: string;         // 가맹점 주소
   tel?: string;            // 가맹점 전화번호
@@ -123,6 +123,36 @@ const SEED_MERCHANTS: VoucherMerchant[] = [
     status: 'available',
     verifiedDate: '2026-07-05',
     terms: '입장권 및 아트샵 일부 상품 결제 가능'
+  },
+  {
+    contentId: '1',
+    voucherType: 'disabled-welfare-card',
+    merchantName: '경복궁',
+    address: '서울특별시 종로구 사직로 161',
+    tel: '02-3700-3900',
+    status: 'available',
+    verifiedDate: '2026-08-22',
+    terms: '등록장애인은 장애인등록증(복지카드) 제시 시 입장료가 면제됩니다.'
+  },
+  {
+    contentId: '2',
+    voucherType: 'disabled-welfare-card',
+    merchantName: '국립중앙박물관',
+    address: '서울특별시 용산구 서빙고로 137',
+    tel: '02-2077-9000',
+    status: 'available',
+    verifiedDate: '2026-08-22',
+    terms: '등록장애인은 장애인등록증(복지카드) 제시 시 국립 박물관 입장료 감면 기준을 적용받습니다.'
+  },
+  {
+    contentId: '10',
+    voucherType: 'disabled-welfare-card',
+    merchantName: '국립현대미술관 서울관',
+    address: '서울특별시 종로구 삼청로 30',
+    tel: '02-3701-9500',
+    status: 'available',
+    verifiedDate: '2026-08-22',
+    terms: '등록장애인은 장애인등록증(복지카드) 제시 시 국·공립 미술관 감면 기준을 적용받습니다.'
   }
 ];
 
@@ -167,6 +197,15 @@ export class VoucherMatcher {
     confidence: number;
     verifiedDate: string;
   } {
+    if (voucherType === 'worker-vacation') {
+      return {
+        status: 'check',
+        detail: '근로자 휴가지원사업 적립금은 휴가샵 온라인몰에 등록된 국내여행 상품에 사용됩니다. 이 장소의 개별 결제 가능 여부는 휴가샵에서 확인해 주세요.',
+        confidence: 100,
+        verifiedDate: '2026-08-22'
+      };
+    }
+
     // 1단계: contentId 직접 매칭이 있는지 확인
     const directMatch = this.merchants.find(
       m => m.voucherType === voucherType && m.contentId === place.contentid
@@ -265,8 +304,10 @@ export class VoucherMatcher {
     const isFoodOrShopping = ['39', '38'].includes(place.contenttypeid);
     const defaultStatus: VoucherStatus = isFoodOrShopping ? 'unavailable' : 'check';
     const defaultDetail = isFoodOrShopping
-      ? '해당 바우처를 이용할 수 있는 등록 가맹점 정보가 없습니다.'
-      : '바우처 가맹점 등록 여부가 시스템에 기록되지 않아, 사전 문의를 권장합니다.';
+      ? '해당 제도를 이용할 수 있는 등록 가맹점 정보가 없습니다.'
+      : voucherType === 'disabled-welfare-card'
+        ? '장애인등록증 감면 적용 여부는 시설별 대상·운영 규정에 따라 달라질 수 있어 방문 전 확인이 필요합니다.'
+        : '바우처 가맹점 등록 여부가 시스템에 기록되지 않아, 사전 문의를 권장합니다.';
 
     return {
       status: defaultStatus,

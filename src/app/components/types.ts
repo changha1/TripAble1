@@ -12,11 +12,14 @@ export type Screen =
 
 export type VoucherStatus = 'available' | 'conditional' | 'check' | 'unavailable';
 
+export type VoucherBenefitType = 'balance' | 'discount' | 'program';
+
 export interface Voucher {
   id: string;
   name: string;
   color: string;
   maxAmount: number;
+  benefitType: VoucherBenefitType;
   description: string;
 }
 

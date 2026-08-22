@@ -1,4 +1,5 @@
 import { MapPin, Accessibility, CreditCard, Heart } from 'lucide-react';
+import { VOUCHERS } from './mockData';
 
 interface StartScreenProps {
   onStart: () => void;
@@ -18,7 +19,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
         </div>
 
         <p className="text-green-100 mb-10 max-w-xs" style={{ fontSize: '0.9rem', lineHeight: '1.7' }}>
-          문화누리카드, 여행이용권 등 복지 바우처로 이용 가능한
+          문화누리카드와 관광 관련 복지·여행 지원 제도로 이용 가능한
           관광지·숙박시설을 쉽고 빠르게 찾아드립니다.
         </p>
 
@@ -54,7 +55,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
       <div className="bg-white/10 backdrop-blur-sm px-6 py-5">
         <p className="text-green-200 mb-3 text-center" style={{ fontSize: '0.75rem' }}>지원 바우처</p>
         <div className="flex gap-2 flex-wrap justify-center">
-          {['문화누리카드', '한국관광공사 여행이용권', '관광두레 이용권', '여가바우처'].map((name) => (
+          {VOUCHERS.map(({ name }) => (
             <span
               key={name}
               className="bg-white/20 text-white rounded-full px-3 py-1"

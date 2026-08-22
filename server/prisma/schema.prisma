@@ -52,7 +52,7 @@ model TripPlanPlace {
 model VoucherMerchant {
   id           String   @id @default(uuid())
   contentId    String?  // 매칭용 관광지 ID (있을 경우)
-  voucherType  String   // 'munhwa-nuri' | etc.
+  voucherType  String   // 'munhwa-nuri' | 'disabled-welfare-card' | 'worker-vacation'
   merchantName String
   address      String
   tel          String?

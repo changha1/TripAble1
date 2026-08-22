@@ -87,7 +87,9 @@ function VoucherStep({ value, onChange }: { value: Voucher | null; onChange: (v:
               </div>
               <p className="text-gray-500 mt-0.5" style={{ fontSize: '0.75rem', lineHeight: 1.4 }}>{v.description}</p>
               <p className="mt-1.5" style={{ fontSize: '0.75rem', fontWeight: 600, color: v.color }}>
-                연간 최대 {v.maxAmount.toLocaleString()}원
+                {v.benefitType === 'balance' && `연간 기본 ${v.maxAmount.toLocaleString()}원`}
+                {v.benefitType === 'discount' && '시설·교통 요금 감면 자격'}
+                {v.benefitType === 'program' && '정부 지원금 10만원 포함, 총 40만원 적립'}
               </p>
             </div>
           </div>
@@ -111,6 +113,25 @@ function BalanceStep({ input, onChange }: {
     setDisplayBalance(numeric);
     onChange('balance', parseInt(numeric) || 0);
   };
+
+  if (input.voucher?.benefitType === 'discount') {
+    return (
+      <div className="px-5 space-y-5">
+        <StepLabel
+          current={2}
+          total={TOTAL_STEPS}
+          title="할인 자격을 확인하세요"
+          subtitle="장애인등록증(복지카드)은 잔액 없이 시설별 감면 혜택을 적용합니다."
+        />
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
+          <p className="text-purple-900" style={{ fontSize: '0.85rem', lineHeight: 1.7 }}>
+            국·공립 관광시설 입장료, 철도·도시철도, 공공체육시설 등은 대상과 시설 규정에 따라 감면됩니다.
+            방문 전 해당 시설의 적용 조건을 확인하세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-5 space-y-5">
@@ -538,7 +559,7 @@ export function TripFinderFlow({ onSearch, onBack }: TripFinderFlowProps) {
   const canProceed = () => {
     switch (step) {
       case 1: return input.voucher !== null;
-      case 2: return input.balance > 0;
+      case 2: return input.voucher?.benefitType === 'discount' || input.balance > 0;
       case 3: return input.region !== '';
       case 4: return input.startDate !== '';
       case 5: return input.partySize >= 1;

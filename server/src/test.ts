@@ -48,6 +48,7 @@ const testInput: TripInput = {
     name: '문화누리카드',
     color: '#16a34a',
     maxAmount: 130000,
+    benefitType: 'balance',
     description: '문화누리카드'
   },
   balance: 50000,
