@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { Place } from './types';
 import { voucherStatusConfig, type VoucherStatus } from './types';
+import { findBenefit } from '../data/benefits';
 
 interface PlaceDetailScreenProps {
   place: Place;
@@ -29,16 +30,18 @@ const STATUS_LABELS: Record<VoucherStatus, string> = {
   unavailable: '바우처 이용 불가',
 };
 
-function AccessibilityItem({ icon, label, available }: { icon: React.ReactNode; label: string; available: boolean }) {
+function AccessibilityItem({ icon, label, available }: { icon: React.ReactNode; label: string; available: boolean | null }) {
+  const confirmed = available === true;
+  const unknown = available === null;
   return (
-    <div className={`rounded-xl p-3 flex items-center gap-2 ${available ? 'bg-blue-50' : 'bg-gray-50'}`}>
-      <div className={`${available ? 'text-blue-500' : 'text-gray-300'}`}>{icon}</div>
+    <div className={`rounded-xl p-3 flex items-center gap-2 ${confirmed ? 'bg-blue-50' : unknown ? 'bg-amber-50' : 'bg-gray-50'}`}>
+      <div className={`${confirmed ? 'text-blue-500' : unknown ? 'text-amber-500' : 'text-gray-300'}`}>{icon}</div>
       <div>
-        <p className={`${available ? 'text-blue-700' : 'text-gray-400'}`} style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+        <p className={`${confirmed ? 'text-blue-700' : unknown ? 'text-amber-700' : 'text-gray-400'}`} style={{ fontSize: '0.75rem', fontWeight: 600 }}>
           {label}
         </p>
-        <p className={`${available ? 'text-blue-500' : 'text-gray-400'}`} style={{ fontSize: '0.68rem' }}>
-          {available ? '이용 가능' : '해당 없음'}
+        <p className={`${confirmed ? 'text-blue-500' : unknown ? 'text-amber-600' : 'text-gray-400'}`} style={{ fontSize: '0.68rem' }}>
+          {confirmed ? '확인됨' : unknown ? '확인 필요' : '없음'}
         </p>
       </div>
     </div>
@@ -125,16 +128,38 @@ export function PlaceDetailScreen({
             </p>
           </div>
 
+          <div className="bg-white border border-gray-100 rounded-2xl p-4">
+            <p className="text-gray-700 mb-3" style={{ fontWeight: 700, fontSize: '0.9rem' }}>사용할 수 있는 여행복지</p>
+            <div className="space-y-2">
+              {(place.benefitApplications || []).map(application => (
+                <div key={application.benefitId} className="flex items-start gap-2">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 ${application.status === 'available' ? 'bg-green-500' : application.status === 'check' ? 'bg-amber-500' : 'bg-gray-300'}`} />
+                  <div className="flex-1">
+                    <p className="text-gray-700" style={{ fontSize: '0.8rem', fontWeight: 700 }}>{findBenefit(application.benefitId)?.name || application.benefitId}</p>
+                    <p className="text-gray-500" style={{ fontSize: '0.72rem', lineHeight: 1.5 }}>{application.detail}</p>
+                  </div>
+                </div>
+              ))}
+              {(!place.benefitApplications || place.benefitApplications.length === 0) && <p className="text-gray-500" style={{ fontSize: '0.75rem' }}>이 장소의 혜택별 상세 정보는 확인이 필요합니다.</p>}
+            </div>
+          </div>
+
           {/* Cost breakdown */}
           <div className="bg-gray-50 rounded-2xl p-4">
             <p className="text-gray-700 mb-3" style={{ fontWeight: 700, fontSize: '0.9rem' }}>예상 이용 금액</p>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-gray-500" style={{ fontSize: '0.85rem' }}>입장료</span>
+                  <span className="text-gray-500" style={{ fontSize: '0.85rem' }}>정상 이용요금</span>
                 <span className="text-gray-700" style={{ fontWeight: 700, fontSize: '0.88rem' }}>
                   {place.entryFee === 0 ? '무료' : `${place.entryFee.toLocaleString()}원`}
                 </span>
               </div>
+              {(place.priceBreakdown?.discountAmount || 0) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500" style={{ fontSize: '0.85rem' }}>자격형 할인</span>
+                  <span className="text-purple-600" style={{ fontWeight: 700, fontSize: '0.88rem' }}>-{(place.priceBreakdown?.discountAmount || 0).toLocaleString()}원</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-gray-500" style={{ fontSize: '0.85rem' }}>바우처 사용 예상액</span>
                 <span className="text-green-600" style={{ fontWeight: 700, fontSize: '0.88rem' }}>

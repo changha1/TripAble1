@@ -7,8 +7,9 @@ import { VoucherMatcher } from './services/voucher.matcher.js';
 import { RecommendScorer } from './services/recommend.scorer.js';
 import { CacheService } from './services/cache.service.js';
 import { AIParser } from './services/ai.parser.js';
-import { TripInput, VoucherStatus, Place } from './types/index.js';
+import { BenefitEligibilityMatch, Place, TripInput, WelfareProfile } from './types/index.js';
 import { TourItem } from './services/tour.interface.js';
+import { BENEFIT_CATALOG, getEligibility } from './data/benefits.js';
 
 dotenv.config();
 
@@ -26,13 +27,42 @@ const REGION_CODES: Record<string, string> = {
 // 바우처 매칭 모듈 생성
 const voucherMatcher = new VoucherMatcher();
 
+const DEFAULT_PROFILE: WelfareProfile = {
+  residenceRegion: '', residenceCity: '', age: undefined,
+  basicLivelihoodRecipient: false, nearPoverty: false, disabled: false,
+  disabilityPensionRecipient: false, disabilityAllowanceRecipient: false, disabledChildAllowanceRecipient: false,
+  singleParentFamily: false, veteran: false, multiChildFamily: false, infantCompanion: false,
+  socialWelfareFacilityUser: false, worker: false, workerVacationParticipant: false,
+};
+
+app.get('/api/benefits', (_req, res) => {
+  res.json({ benefits: BENEFIT_CATALOG });
+});
+
+app.post('/api/benefits/eligibility', (req, res) => {
+  const profile = { ...DEFAULT_PROFILE, ...req.body } as WelfareProfile;
+  const matches: BenefitEligibilityMatch[] = BENEFIT_CATALOG.map(benefit => {
+    const result = getEligibility(profile, benefit);
+    return {
+      benefitId: benefit.id,
+      eligibility: result.eligibility,
+      reason: result.reason,
+      requiresManualCheck: benefit.requiresManualCheck,
+    };
+  });
+  res.json({ matches });
+});
+
 // 3.1 & 3.2 통합 검색 파이프라인
 app.post('/api/search', async (req, res, next) => {
   try {
-    const input = req.body as TripInput;
-    if (!input.voucher) {
-      return res.status(400).json({ error: '보보유 바우처 정보는 필수입니다.' });
-    }
+    const input = {
+      ...req.body,
+      benefits: Array.isArray(req.body?.benefits) ? req.body.benefits : [],
+      transportation: Array.isArray(req.body?.transportation) ? req.body.transportation : [],
+      accessibility: Array.isArray(req.body?.accessibility) ? req.body.accessibility : [],
+      tourismTypes: Array.isArray(req.body?.tourismTypes) ? req.body.tourismTypes : [],
+    } as TripInput;
 
     const cacheKey = CacheService.generateKey(input);
     const cachedResult = CacheService.get<Place[]>(cacheKey);
@@ -87,7 +117,7 @@ app.post('/api/search', async (req, res, next) => {
     }
 
     // 1단계: 필수 필터링
-    const matchFn = (item: TourItem) => voucherMatcher.match(item, input.voucher!.id);
+    const matchFn = (item: TourItem) => voucherMatcher.matchBenefits(item, input, BENEFIT_CATALOG);
     const filtered = RecommendScorer.filterItems(rawItems, input, matchFn);
 
     // 2단계 & 3단계: 추천 점수 계산 및 추천 사유 생성 및 정렬
@@ -247,6 +277,35 @@ app.get('/api/favorites', async (req, res, next) => {
   }
 });
 
+app.get('/api/users/:userId/benefits', async (req, res, next) => {
+  try {
+    const benefits = await prisma.userBenefit.findMany({
+      where: { userId: req.params.userId },
+      orderBy: { priority: 'asc' },
+    });
+    return res.json({ benefits });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/users/:userId/benefits', async (req, res, next) => {
+  try {
+    const { benefitId, enabled = true, owned = true, balance, expiresAt, priority = 0 } = req.body;
+    if (!benefitId || !BENEFIT_CATALOG.some(benefit => benefit.id === benefitId)) {
+      return res.status(400).json({ error: '등록할 수 없는 여행복지입니다.' });
+    }
+    const benefit = await prisma.userBenefit.upsert({
+      where: { userId_benefitId: { userId: req.params.userId, benefitId } },
+      update: { enabled, owned, balance, expiresAt: expiresAt || null, priority },
+      create: { userId: req.params.userId, benefitId, enabled, owned, balance, expiresAt: expiresAt || null, priority },
+    });
+    return res.json({ benefit });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // 3.7 여행 계획 저장 및 목록 조회
 app.post('/api/trips', async (req, res, next) => {
   try {
@@ -257,6 +316,9 @@ app.post('/api/trips', async (req, res, next) => {
       duration,
       places, // Array of { placeId, visitOrder, entryFee, selfPay }
       totalVoucherAmount,
+      totalDiscountAmount,
+      totalVoucherCovered,
+      benefitSummary,
       totalSelfPay,
       remainingBalance
     } = req.body;
@@ -272,6 +334,8 @@ app.post('/api/trips', async (req, res, next) => {
         travelDate,
         duration,
         totalVoucherAmount,
+        totalDiscountAmount: totalDiscountAmount || 0,
+        totalVoucherCovered: totalVoucherCovered || totalVoucherAmount || 0,
         totalSelfPay,
         remainingBalance,
         places: {
@@ -281,10 +345,19 @@ app.post('/api/trips', async (req, res, next) => {
             entryFee: p.entryFee,
             selfPay: p.selfPay
           }))
+        },
+        benefitSummary: {
+          create: Array.isArray(benefitSummary) ? benefitSummary.map((benefit: any) => ({
+            benefitId: benefit.benefitId,
+            usedAmount: benefit.usedAmount || 0,
+            remainingAmount: benefit.remainingAmount,
+            discountAmount: benefit.discountAmount || 0,
+          })) : []
         }
       },
       include: {
-        places: true
+        places: true,
+        benefitSummary: true
       }
     });
 
@@ -304,7 +377,8 @@ app.get('/api/trips', async (req, res, next) => {
     const plans = await prisma.tripPlan.findMany({
       where: { userId },
       include: {
-        places: true
+        places: true,
+        benefitSummary: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -322,7 +396,8 @@ app.get('/api/trips/:id', async (req, res, next) => {
     const plan = await prisma.tripPlan.findUnique({
       where: { id },
       include: {
-        places: true
+        places: true,
+        benefitSummary: true
       }
     });
 

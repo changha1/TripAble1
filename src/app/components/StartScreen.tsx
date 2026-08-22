@@ -15,7 +15,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
             <MapPin className="w-10 h-10 text-white" strokeWidth={1.5} />
           </div>
           <h1 className="text-white mb-1" style={{ fontSize: '2rem', fontWeight: 700 }}>TripAble</h1>
-          <p className="text-green-200" style={{ fontSize: '1rem' }}>내 바우처로 떠나는 맞춤 여행</p>
+          <p className="text-green-200" style={{ fontSize: '1rem' }}>내 여행복지로 떠나는 맞춤 여행</p>
         </div>
 
         <p className="text-green-100 mb-10 max-w-xs" style={{ fontSize: '0.9rem', lineHeight: '1.7' }}>
@@ -26,7 +26,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
         {/* Feature badges */}
         <div className="grid grid-cols-2 gap-3 w-full max-w-xs mb-10">
           {[
-            { icon: CreditCard, label: '바우처 맞춤 검색', desc: '잔액 내 이용 가능한 곳만' },
+            { icon: CreditCard, label: '여행복지 맞춤 검색', desc: '잔액·자격에 맞는 장소' },
             { icon: Accessibility, label: '편의시설 필터', desc: '휠체어·엘리베이터 등' },
             { icon: MapPin, label: '지역·날짜 선택', desc: '당일·1박2일 여행 계획' },
             { icon: Heart, label: '관심 장소 저장', desc: '나만의 여행 리스트' },
@@ -53,7 +53,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
 
       {/* Voucher types */}
       <div className="bg-white/10 backdrop-blur-sm px-6 py-5">
-        <p className="text-green-200 mb-3 text-center" style={{ fontSize: '0.75rem' }}>지원 바우처</p>
+        <p className="text-green-200 mb-3 text-center" style={{ fontSize: '0.75rem' }}>연결된 여행복지</p>
         <div className="flex gap-2 flex-wrap justify-center">
           {VOUCHERS.map(({ name }) => (
             <span

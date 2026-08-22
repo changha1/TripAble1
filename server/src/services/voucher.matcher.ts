@@ -1,15 +1,16 @@
 import { TourItem } from './tour.interface.js';
-import { VoucherStatus } from '../types/index.js';
+import { BenefitApplication, BenefitDefinition, BenefitStatus, TripInput } from '../types/index.js';
 
 export interface VoucherMerchant {
   contentId?: string;       // 한국관광공사 contentid가 식별된 경우 매칭 속도 향상
-  voucherType: string;     // 'munhwa-nuri' | 'disabled-welfare-card' | 'worker-vacation'
+  voucherType: string;     // 'munhwa-nuri' | 'forest-welfare' | 'disabled-discount' | 'senior-discount' | 'worker-vacation'
   merchantName: string;    // 가맹점명
   address: string;         // 가맹점 주소
   tel?: string;            // 가맹점 전화번호
   latitude?: number;       // 위도
   longitude?: number;      // 경도
-  status: VoucherStatus;
+  status: BenefitStatus;
+  discountRate?: number;
   verifiedDate: string;    // 가맹점 정보 최종 확인일
   terms?: string;          // 이용 조건 및 혜택
 }
@@ -126,31 +127,34 @@ const SEED_MERCHANTS: VoucherMerchant[] = [
   },
   {
     contentId: '1',
-    voucherType: 'disabled-welfare-card',
+    voucherType: 'disabled-discount',
     merchantName: '경복궁',
     address: '서울특별시 종로구 사직로 161',
     tel: '02-3700-3900',
     status: 'available',
+    discountRate: 1,
     verifiedDate: '2026-08-22',
     terms: '등록장애인은 장애인등록증(복지카드) 제시 시 입장료가 면제됩니다.'
   },
   {
     contentId: '2',
-    voucherType: 'disabled-welfare-card',
+    voucherType: 'disabled-discount',
     merchantName: '국립중앙박물관',
     address: '서울특별시 용산구 서빙고로 137',
     tel: '02-2077-9000',
     status: 'available',
+    discountRate: 1,
     verifiedDate: '2026-08-22',
     terms: '등록장애인은 장애인등록증(복지카드) 제시 시 국립 박물관 입장료 감면 기준을 적용받습니다.'
   },
   {
     contentId: '10',
-    voucherType: 'disabled-welfare-card',
+    voucherType: 'disabled-discount',
     merchantName: '국립현대미술관 서울관',
     address: '서울특별시 종로구 삼청로 30',
     tel: '02-3701-9500',
     status: 'available',
+    discountRate: 1,
     verifiedDate: '2026-08-22',
     terms: '등록장애인은 장애인등록증(복지카드) 제시 시 국·공립 미술관 감면 기준을 적용받습니다.'
   }
@@ -192,7 +196,8 @@ export class VoucherMatcher {
    * 한국관광공사 관광 정보 아이템과 바우처 가맹점 테이블을 비교하여 매칭 결과를 도출합니다.
    */
   public match(place: TourItem, voucherType: string): {
-    status: VoucherStatus;
+    status: BenefitStatus;
+    discountRate?: number;
     detail: string;
     confidence: number;
     verifiedDate: string;
@@ -206,6 +211,15 @@ export class VoucherMatcher {
       };
     }
 
+    if (voucherType === 'forest-welfare') {
+      return {
+        status: 'unavailable',
+        detail: '산림복지서비스이용권은 등록 산림복지시설에서만 사용할 수 있습니다. 이 장소의 등록 여부를 확인할 수 없습니다.',
+        confidence: 100,
+        verifiedDate: '2026-08-22'
+      };
+    }
+
     // 1단계: contentId 직접 매칭이 있는지 확인
     const directMatch = this.merchants.find(
       m => m.voucherType === voucherType && m.contentId === place.contentid
@@ -214,6 +228,7 @@ export class VoucherMatcher {
     if (directMatch) {
       return {
         status: directMatch.status,
+        discountRate: directMatch.discountRate,
         detail: directMatch.terms || `${directMatch.merchantName}은(는) 가맹점으로 확인되었습니다.`,
         confidence: 100,
         verifiedDate: directMatch.verifiedDate
@@ -285,6 +300,7 @@ export class VoucherMatcher {
     if (bestMatch && roundedConfidence >= 75) {
       return {
         status: bestMatch.status,
+        discountRate: bestMatch.discountRate,
         detail: bestMatch.terms || `${bestMatch.merchantName}은(는) 가맹점으로 확인되었습니다.`,
         confidence: roundedConfidence,
         verifiedDate: bestMatch.verifiedDate
@@ -302,12 +318,14 @@ export class VoucherMatcher {
 
     // 음식점(39) 및 쇼핑(38)은 가맹점이 확인되지 않은 경우 자동으로 사용 불가(unavailable) 처리하거나 안전하게 확인 필요(check) 처리
     const isFoodOrShopping = ['39', '38'].includes(place.contenttypeid);
-    const defaultStatus: VoucherStatus = isFoodOrShopping ? 'unavailable' : 'check';
+    const defaultStatus: BenefitStatus = isFoodOrShopping ? 'unavailable' : 'check';
     const defaultDetail = isFoodOrShopping
       ? '해당 제도를 이용할 수 있는 등록 가맹점 정보가 없습니다.'
-      : voucherType === 'disabled-welfare-card'
-        ? '장애인등록증 감면 적용 여부는 시설별 대상·운영 규정에 따라 달라질 수 있어 방문 전 확인이 필요합니다.'
-        : '바우처 가맹점 등록 여부가 시스템에 기록되지 않아, 사전 문의를 권장합니다.';
+        : voucherType === 'disabled-discount'
+          ? '장애인등록증 감면 적용 여부는 시설별 대상·운영 규정에 따라 달라질 수 있어 방문 전 확인이 필요합니다.'
+          : voucherType === 'senior-discount'
+            ? '경로우대 적용 여부는 시설별 기준과 신분증 확인이 필요합니다.'
+          : '바우처 가맹점 등록 여부가 시스템에 기록되지 않아, 사전 문의를 권장합니다.';
 
     return {
       status: defaultStatus,
@@ -315,5 +333,24 @@ export class VoucherMatcher {
       confidence: 0,
       verifiedDate: 'N/A'
     };
+  }
+
+  public matchBenefits(place: TourItem, input: TripInput, definitions: BenefitDefinition[]): BenefitApplication[] {
+    return input.benefits.filter(benefit => benefit.enabled && benefit.owned).map(benefit => {
+      const definition = definitions.find(item => item.id === benefit.benefitId);
+      const result = this.match(place, benefit.benefitId);
+      return {
+        benefitId: benefit.benefitId,
+        status: result.status,
+        detail: result.detail,
+        verifiedDate: result.verifiedDate,
+        sourceName: definition?.sourceName,
+        sourceUrl: definition?.sourceUrl,
+        confidence: result.confidence,
+        dataStatus: definition?.dataStatus,
+        applicable: result.status === 'available' || result.status === 'conditional',
+        discountRate: result.discountRate,
+      };
+    });
   }
 }

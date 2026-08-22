@@ -1,31 +1,8 @@
-import type { Voucher, Place, TripPlan } from './types';
+import type { Place, TripPlan } from './types';
+import { BENEFIT_CATALOG } from '../data/benefits';
 
-export const VOUCHERS: Voucher[] = [
-  {
-    id: 'munhwa-nuri',
-    name: '문화누리카드',
-    color: '#16a34a',
-    maxAmount: 150000,
-    benefitType: 'balance',
-    description: '기초생활수급자·차상위계층을 위한 국내 문화·관광·체육 지원 카드',
-  },
-  {
-    id: 'disabled-welfare-card',
-    name: '장애인등록증(복지카드)',
-    color: '#7c3aed',
-    maxAmount: 0,
-    benefitType: 'discount',
-    description: '국·공립 관광시설 무료 및 교통·공공체육시설 요금 감면 자격',
-  },
-  {
-    id: 'worker-vacation',
-    name: '근로자 휴가지원사업',
-    color: '#2563eb',
-    maxAmount: 100000,
-    benefitType: 'program',
-    description: '참여 근로자의 국내여행 상품 구매를 돕는 정부·기업 공동 적립 제도',
-  },
-];
+// Existing demo screens consume this export; policy data itself lives in the central catalog.
+export const VOUCHERS = BENEFIT_CATALOG;
 
 export const REGIONS = [
   '서울', '부산', '인천', '대구', '광주', '대전', '울산', '세종',

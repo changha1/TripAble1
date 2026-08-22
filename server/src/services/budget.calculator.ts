@@ -1,132 +1,149 @@
-import { VoucherStatus } from '../types/index.js';
+import type {
+  BenefitApplication,
+  BenefitDefinition,
+  BenefitStatus,
+  PriceBreakdown,
+  UserBenefit,
+} from '../types/index.js';
 
 export interface BudgetCost {
-  entryFee: number;                  // 원래 전체 입장료/이용요금 (-1 이면 가격 확인 필요)
-  voucherCovered: number;            // 바우처 예상 결제금액
-  selfPay: number;                  // 본인부담 예상금액 (바우처 잔액 초과분)
-  voucherUnavailableCost: number;   // 바우처 사용 불가능 비용 (가맹점 아님 등으로 본인이 100% 내야 하는 비용)
-  isPriceConfirmed: boolean;        // 요금 정보 확인 여부
+  entryFee: number;
+  voucherCovered: number;
+  selfPay: number;
+  voucherUnavailableCost: number;
+  isPriceConfirmed: boolean;
+  discountAmount: number;
+  priceBreakdown: PriceBreakdown;
+  applications: BenefitApplication[];
+}
+
+export interface PlanBudgetSummary {
+  totalDiscountAmount: number;
+  totalVoucherCovered: number;
+  totalVoucherAmount: number;
+  totalSelfPay: number;
+  remainingBalanceByBenefit: Record<string, number>;
+}
+
+function parsePrice(rawFee: number | string | undefined | null): { value: number; confirmed: boolean } {
+  if (rawFee === undefined || rawFee === null) return { value: -1, confirmed: false };
+  if (typeof rawFee === 'number') return { value: rawFee >= 0 ? rawFee : -1, confirmed: rawFee >= 0 };
+  const cleaned = rawFee.replace(/,/g, '').trim();
+  if (cleaned.includes('무료') || cleaned === '0' || cleaned === '') return { value: 0, confirmed: true };
+  const match = cleaned.match(/\d+/);
+  return match ? { value: Number(match[0]), confirmed: true } : { value: -1, confirmed: false };
 }
 
 export class BudgetCalculator {
-  /**
-   * 개별 장소의 요금 및 바우처 적용 비용을 계산합니다.
-   * 
-   * @param rawFee 문자열 요금 정보 (OpenAPI usefee 등) 또는 숫자 요금
-   * @param status 바우처 매칭 상태
-   * @param balance 현재 바우처 잔액
-   */
-  public static calculatePlaceCost(
+  public static calculateMultiBenefitCost(
     rawFee: number | string | undefined | null,
-    status: VoucherStatus,
-    balance: number
+    applications: BenefitApplication[],
+    definitions: BenefitDefinition[],
+    benefits: UserBenefit[],
   ): BudgetCost {
-    let entryFee = 0;
-    let isPriceConfirmed = true;
-
-    if (rawFee === undefined || rawFee === null) {
-      entryFee = -1;
-      isPriceConfirmed = false;
-    } else if (typeof rawFee === 'number') {
-      entryFee = rawFee;
-      if (entryFee < 0) {
-        isPriceConfirmed = false;
-      }
-    } else {
-      // 문자열인 경우 숫자 파싱 시도 (예: "3,000원" -> 3000, "무료" -> 0)
-      const cleaned = rawFee.replace(/,/g, '').trim();
-      if (cleaned.includes('무료') || cleaned === '0' || cleaned === '') {
-        entryFee = 0;
-      } else {
-        const matches = cleaned.match(/\d+/);
-        if (matches) {
-          entryFee = parseInt(matches[0]);
-        } else {
-          entryFee = -1;
-          isPriceConfirmed = false;
-        }
-      }
-    }
-
-    // 가격 미확인인 경우 요금 계산에서 제외
-    if (!isPriceConfirmed) {
+    const parsed = parsePrice(rawFee);
+    if (!parsed.confirmed) {
       return {
-        entryFee: -1,
-        voucherCovered: 0,
-        selfPay: 0,
-        voucherUnavailableCost: 0,
-        isPriceConfirmed: false,
+        entryFee: -1, voucherCovered: 0, selfPay: 0, voucherUnavailableCost: 0,
+        isPriceConfirmed: false, discountAmount: 0,
+        priceBreakdown: { originalPrice: null, discountAmount: 0, discountedPrice: null, voucherCovered: 0, selfPay: null, priceConfirmed: false },
+        applications,
       };
     }
 
+    let remainingPrice = parsed.value;
+    let discountAmount = 0;
     let voucherCovered = 0;
-    let selfPay = 0;
-    let voucherUnavailableCost = 0;
+    const updatedApplications = applications.map(application => ({ ...application }));
 
-    if (status === 'available' || status === 'conditional') {
-      // 바우처 적용 가능
-      if (balance >= entryFee) {
-        voucherCovered = entryFee;
-        selfPay = 0;
-      } else {
-        voucherCovered = balance;
-        selfPay = entryFee - balance;
+    // Discounts are applied before balance-type benefits. Multiple discounts are deliberately not stacked.
+    const discountApplication = updatedApplications.find(application => {
+      const definition = definitions.find(item => item.id === application.benefitId);
+      return definition?.category === 'discount' && (application.status === 'available' || application.status === 'conditional');
+    });
+    if (discountApplication) {
+      const rate = discountApplication.discountRate || 0;
+      const fixed = discountApplication.discountAmount || 0;
+      const amount = rate > 0 ? Math.round(parsed.value * rate) : fixed;
+      discountAmount = Math.min(parsed.value, amount);
+      remainingPrice = Math.max(0, parsed.value - discountAmount);
+      discountApplication.discountAmount = discountAmount;
+    }
+
+    const balanceBenefits = benefits
+      .filter(benefit => benefit.enabled && benefit.owned)
+      .map(benefit => ({ benefit, definition: definitions.find(item => item.id === benefit.benefitId) }))
+      .filter(item => item.definition?.category === 'balance');
+
+    for (const { benefit } of balanceBenefits) {
+      const application = updatedApplications.find(item => item.benefitId === benefit.benefitId);
+      if (!application || !['available', 'conditional'].includes(application.status)) continue;
+      const balance = Math.max(0, benefit.balance || 0);
+      const covered = Math.min(remainingPrice, balance);
+      application.coveredAmount = covered;
+      application.remainingBalance = balance - covered;
+      application.applicable = true;
+      voucherCovered += covered;
+      remainingPrice -= covered;
+      if (remainingPrice <= 0) break;
+    }
+
+    for (const application of updatedApplications) {
+      const definition = definitions.find(item => item.id === application.benefitId);
+      if (definition?.category === 'balance' && application.coveredAmount === undefined) {
+        application.coveredAmount = 0;
+        application.applicable = application.status === 'available' || application.status === 'conditional';
+        const owned = benefits.find(item => item.benefitId === application.benefitId);
+        application.remainingBalance = owned?.balance;
       }
-    } else {
-      // 바우처 사용 불가능(unavailable) 또는 확인 필요(check)인 경우 본인 부담으로 처리
-      voucherCovered = 0;
-      selfPay = 0;
-      voucherUnavailableCost = entryFee;
     }
 
     return {
-      entryFee,
+      entryFee: parsed.value,
       voucherCovered,
-      selfPay,
-      voucherUnavailableCost,
-      isPriceConfirmed,
+      selfPay: remainingPrice,
+      voucherUnavailableCost: 0,
+      isPriceConfirmed: true,
+      discountAmount,
+      priceBreakdown: {
+        originalPrice: parsed.value,
+        discountAmount,
+        discountedPrice: parsed.value - discountAmount,
+        voucherCovered,
+        selfPay: remainingPrice,
+        priceConfirmed: true,
+      },
+      applications: updatedApplications,
     };
   }
 
-  /**
-   * 여러 개의 장소 목록에 대한 통합 일정 예산을 요약 계산합니다.
-   */
+  // Kept for isolated legacy tests; new search code uses calculateMultiBenefitCost.
+  public static calculatePlaceCost(rawFee: number | string | undefined | null, status: BenefitStatus, balance: number): BudgetCost {
+    const application: BenefitApplication = { benefitId: 'legacy', status, detail: '기존 호환 계산', coveredAmount: 0 };
+    return this.calculateMultiBenefitCost(rawFee, [application], [{
+      id: 'legacy', name: 'legacy', category: 'balance', description: '', policyYear: 0, priority: 0,
+      eligibilitySummary: '', amount: null, amountLabel: '', usageChannel: '', sourceName: '', sourceUrl: '',
+      verifiedAt: '', requiresManualCheck: true, dataStatus: 'mock', color: '#000000'
+    }], [{ benefitId: 'legacy', enabled: true, owned: true, balance }]);
+  }
+
   public static calculateTotalPlanBudget(
-    placesCosts: { cost: BudgetCost; status: VoucherStatus }[],
-    initialBalance: number
-  ): {
-    totalVoucherAmount: number;
-    totalSelfPay: number;
-    remainingBalance: number;
-  } {
-    let currentBalance = initialBalance;
-    let totalVoucherAmount = 0;
+    placesCosts: { cost: BudgetCost; applications?: BenefitApplication[] }[],
+    benefits: UserBenefit[] = [],
+  ): PlanBudgetSummary {
+    const remainingBalanceByBenefit: Record<string, number> = {};
+    benefits.forEach(benefit => { if (benefit.balance !== undefined) remainingBalanceByBenefit[benefit.benefitId] = benefit.balance; });
+    let totalDiscountAmount = 0;
+    let totalVoucherCovered = 0;
     let totalSelfPay = 0;
-
     for (const item of placesCosts) {
-      const c = item.cost;
-      if (!c.isPriceConfirmed) continue; // 가격 미확인 장소는 합산에서 제외
-
-      if (item.status === 'available' || item.status === 'conditional') {
-        // 바우처 잔액 차감식 계산
-        if (currentBalance >= c.entryFee) {
-          totalVoucherAmount += c.entryFee;
-          currentBalance -= c.entryFee;
-        } else {
-          totalVoucherAmount += currentBalance;
-          totalSelfPay += (c.entryFee - currentBalance);
-          currentBalance = 0;
-        }
-      } else {
-        // 바우처 사용 불가/확인 필요 -> 전액 본인부담금 추가
-        totalSelfPay += c.entryFee;
+      totalDiscountAmount += item.cost.discountAmount;
+      totalVoucherCovered += item.cost.voucherCovered;
+      totalSelfPay += item.cost.isPriceConfirmed ? item.cost.selfPay : 0;
+      for (const application of item.cost.applications) {
+        if (application.remainingBalance !== undefined) remainingBalanceByBenefit[application.benefitId] = application.remainingBalance;
       }
     }
-
-    return {
-      totalVoucherAmount,
-      totalSelfPay,
-      remainingBalance: currentBalance,
-    };
+    return { totalDiscountAmount, totalVoucherCovered, totalVoucherAmount: totalVoucherCovered, totalSelfPay, remainingBalanceByBenefit };
   }
 }

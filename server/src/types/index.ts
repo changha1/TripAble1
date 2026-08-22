@@ -1,39 +1,116 @@
-export type VoucherStatus = 'available' | 'conditional' | 'check' | 'unavailable';
+export type BenefitCategory = 'balance' | 'discount' | 'program' | 'accessibility';
+export type BenefitEligibility = 'likely' | 'possible' | 'check' | 'not-eligible';
+export type BenefitStatus = 'available' | 'conditional' | 'check' | 'unavailable';
+export type VoucherStatus = BenefitStatus;
+export type BenefitDataStatus = 'verified' | 'stale' | 'manual-check' | 'mock';
+export type AccessValue = boolean | null;
 
-export type VoucherBenefitType = 'balance' | 'discount' | 'program';
-
-export interface Voucher {
+export interface BenefitDefinition {
   id: string;
   name: string;
-  color: string;
-  maxAmount: number;
-  benefitType: VoucherBenefitType;
+  category: BenefitCategory;
   description: string;
+  policyYear: number;
+  priority: number;
+  eligibilitySummary: string;
+  amount: number | null;
+  amountLabel: string;
+  usageChannel: string;
+  sourceName: string;
+  sourceUrl: string;
+  verifiedAt: string;
+  requiresManualCheck: boolean;
+  dataStatus: BenefitDataStatus;
+  color: string;
+}
+
+export interface WelfareProfile {
+  residenceRegion: string;
+  residenceCity?: string;
+  age?: number;
+  basicLivelihoodRecipient: boolean;
+  nearPoverty: boolean;
+  disabled: boolean;
+  disabilityPensionRecipient: boolean;
+  disabilityAllowanceRecipient: boolean;
+  disabledChildAllowanceRecipient: boolean;
+  singleParentFamily: boolean;
+  veteran: boolean;
+  multiChildFamily: boolean;
+  infantCompanion: boolean;
+  socialWelfareFacilityUser: boolean;
+  worker: boolean;
+  workerVacationParticipant?: boolean;
+}
+
+export interface UserBenefit {
+  benefitId: string;
+  enabled: boolean;
+  owned: boolean;
+  balance?: number;
+  expiresAt?: string;
+  priority?: number;
+}
+
+export interface BenefitEligibilityMatch {
+  benefitId: string;
+  eligibility: BenefitEligibility;
+  reason: string;
+  requiresManualCheck: boolean;
+}
+
+export interface BenefitApplication {
+  benefitId: string;
+  status: BenefitStatus;
+  detail: string;
+  verifiedDate?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  confidence?: number;
+  dataStatus?: BenefitDataStatus;
+  originalPrice?: number;
+  discountAmount?: number;
+  coveredAmount?: number;
+  discountRate?: number;
+  applicable?: boolean;
+  remainingBalance?: number;
+}
+
+export interface PriceBreakdown {
+  originalPrice: number | null;
+  discountAmount: number;
+  discountedPrice: number | null;
+  voucherCovered: number;
+  selfPay: number | null;
+  priceConfirmed: boolean;
 }
 
 export interface AccessibilityInfo {
-  wheelchair: boolean;
-  disabledToilet: boolean;
-  disabledParking: boolean;
-  elevator: boolean;
-  babyFacility: boolean;
-  seniorFriendly: boolean;
-  restArea: boolean;
+  wheelchair: AccessValue;
+  disabledToilet: AccessValue;
+  disabledParking: AccessValue;
+  elevator: AccessValue;
+  babyFacility: AccessValue;
+  seniorFriendly: AccessValue;
+  restArea: AccessValue;
 }
 
 export interface Place {
-  id: string; // contentid in TourAPI
-  name: string; // title
-  type: string; // contentType name (관광지, 문화시설 등)
-  types: string[]; // types array (history, culture, nature, experience, performance, rest, sports, shopping)
-  region: string; // areaCode mapped name
-  city: string; // sigunguCode mapped name
-  address: string; // addr1 (+ addr2)
-  phone: string; // tel
-  image: string; // firstimage
-  rating: number; // calculated/mock rating
-  reviewCount: number; // mock review count
-  voucherStatus: VoucherStatus;
+  id: string;
+  name: string;
+  type: string;
+  types: string[];
+  region: string;
+  city: string;
+  address: string;
+  phone: string;
+  image: string;
+  rating: number;
+  reviewCount: number;
+  overallBenefitStatus: BenefitStatus;
+  benefitApplications: BenefitApplication[];
+  priceBreakdown: PriceBreakdown;
+  voucherStatus: BenefitStatus;
   voucherStatusDetail: string;
   entryFee: number;
   selfPay: number;
@@ -49,18 +126,24 @@ export interface Place {
 }
 
 export interface TripInput {
-  voucher: Voucher | null;
-  balance: number;
-  endDate: string;
-  region: string; // region name (e.g. '서울', '경기' 등)
+  benefits: UserBenefit[];
+  welfareProfile?: WelfareProfile;
+  region: string;
   startDate: string;
   duration: 'day' | 'overnight';
   partySize: number;
-  tourismTypes: string[]; // e.g. ['nature', 'history']
-  transportation: string[]; // e.g. ['public', 'car', 'min-walk', 'parking', 'nearby']
-  accessibility: string[]; // e.g. ['wheelchair', 'disabled-toilet', 'disabled-parking', 'elevator', 'baby', 'senior', 'rest-area']
+  tourismTypes: string[];
+  transportation: string[];
+  accessibility: string[];
   selfPayBudget: number;
   paymentPreference: 'online' | 'offline' | 'both';
+}
+
+export interface BenefitSummary {
+  benefitId: string;
+  usedAmount: number;
+  remainingAmount?: number;
+  discountAmount?: number;
 }
 
 export interface TripPlan {
@@ -69,8 +152,11 @@ export interface TripPlan {
   travelDate: string;
   duration: 'day' | 'overnight';
   places: Place[];
-  totalVoucherAmount: number;
+  benefitSummary: BenefitSummary[];
+  totalDiscountAmount: number;
+  totalVoucherCovered: number;
   totalSelfPay: number;
+  totalVoucherAmount: number;
   remainingBalance: number;
   createdAt: string;
 }

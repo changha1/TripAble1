@@ -9,9 +9,11 @@ import { SavedTripsScreen } from './components/SavedTripsScreen';
 import { FavoritesScreen } from './components/FavoritesScreen';
 import { MyPageScreen } from './components/MyPageScreen';
 import { GuideScreen } from './components/GuideScreen';
+import { BenefitFinderScreen, DEFAULT_WELFARE_PROFILE } from './components/BenefitFinderScreen';
+import { BenefitResultsScreen } from './components/BenefitResultsScreen';
 import { BottomNav } from './components/BottomNav';
 import { MOCK_PLACES, SAMPLE_SAVED_TRIPS } from './components/mockData';
-import type { Screen, Place, TripInput, TripPlan } from './components/types';
+import type { BenefitEligibilityMatch, Screen, Place, TripInput, TripPlan, UserBenefit, WelfareProfile } from './components/types';
 import {
   loginUser,
   searchPlaces,
@@ -19,12 +21,13 @@ import {
   toggleFavoriteApi,
   getFavoritesApi,
   saveTripPlanApi,
-  getTripPlansApi
+  getTripPlansApi,
+  findEligibleBenefits,
 } from './utils/api';
 
 const DEFAULT_TRIP_INPUT: TripInput = {
-  voucher: null,
-  balance: 0,
+  benefits: [],
+  welfareProfile: DEFAULT_WELFARE_PROFILE,
   endDate: '',
   region: '',
   startDate: '',
@@ -51,6 +54,8 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [welfareProfile, setWelfareProfile] = useState<WelfareProfile>(DEFAULT_WELFARE_PROFILE);
+  const [benefitMatches, setBenefitMatches] = useState<BenefitEligibilityMatch[]>([]);
 
   // 로그인 성공 시 백엔드에서 사용자 저장 목록 로드
   const handleLogin = async () => {
@@ -157,6 +162,26 @@ export default function App() {
     }
   };
 
+  const handleFindBenefits = async (profile: WelfareProfile) => {
+    setIsLoading(true);
+    try {
+      const matches = await findEligibleBenefits(profile);
+      setWelfareProfile(profile);
+      setBenefitMatches(matches);
+      navigate('benefit-results');
+    } catch (e) {
+      alert('여행복지 후보를 불러오지 못했습니다. 백엔드 상태를 확인해 주세요.');
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleContinueWithBenefits = (benefits: UserBenefit[]) => {
+    setTripInput(previous => ({ ...previous, benefits, welfareProfile }));
+    navigate('trip-finder');
+  };
+
   const handleSelectPlace = async (place: Place) => {
     setIsLoading(true);
     try {
@@ -201,8 +226,13 @@ export default function App() {
   const isFavorite = (placeId: string) => favorites.some(p => p.id === placeId);
 
   const handleCreateTripPlan = (places: Place[]) => {
-    const voucherAmount = places.reduce((s, p) => s + (p.entryFee - p.selfPay), 0);
-    const selfPayTotal = places.reduce((s, p) => s + p.selfPay, 0);
+    const voucherAmount = places.reduce((sum, place) => sum + (place.priceBreakdown?.voucherCovered ?? Math.max(0, place.entryFee - place.selfPay)), 0);
+    const discountAmount = places.reduce((sum, place) => sum + (place.priceBreakdown?.discountAmount ?? 0), 0);
+    const selfPayTotal = places.reduce((sum, place) => sum + (place.priceBreakdown?.selfPay ?? place.selfPay), 0);
+    const benefitSummary = tripInput.benefits.map(benefit => {
+      const usedAmount = places.reduce((sum, place) => sum + (place.benefitApplications?.find(application => application.benefitId === benefit.benefitId)?.coveredAmount || 0), 0);
+      return { benefitId: benefit.benefitId, usedAmount, remainingAmount: benefit.balance !== undefined ? Math.max(0, benefit.balance - usedAmount) : undefined };
+    });
     const regionName = places[0]?.region || tripInput.region || '전국';
     const plan: TripPlan = {
       id: Date.now().toString(),
@@ -210,9 +240,12 @@ export default function App() {
       travelDate: tripInput.startDate || new Date().toISOString().split('T')[0],
       duration: tripInput.duration,
       places,
+      benefitSummary,
+      totalDiscountAmount: discountAmount,
+      totalVoucherCovered: Math.max(0, voucherAmount),
       totalVoucherAmount: Math.max(0, voucherAmount),
       totalSelfPay: selfPayTotal,
-      remainingBalance: Math.max(0, (tripInput.balance || 0) - Math.max(0, voucherAmount)),
+      remainingBalance: benefitSummary.reduce((sum, benefit) => sum + (benefit.remainingAmount || 0), 0),
       createdAt: new Date().toISOString().split('T')[0],
     };
     setTripPlan(plan);
@@ -235,7 +268,7 @@ export default function App() {
     });
   };
 
-  const showBottomNav = !['start', 'trip-finder', 'place-detail', 'trip-plan', 'guide'].includes(screen);
+  const showBottomNav = !['start', 'trip-finder', 'benefit-finder', 'benefit-results', 'place-detail', 'trip-plan', 'guide'].includes(screen);
 
   return (
     <div className="size-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' }}>
@@ -259,6 +292,7 @@ export default function App() {
           {screen === 'home' && (
             <HomeScreen
               onFindTrip={() => navigate('trip-finder')}
+              onFindBenefits={() => navigate('benefit-finder')}
               onSelectPlace={handleSelectPlace}
               navigate={navigate}
               isLoggedIn={isLoggedIn}
@@ -269,6 +303,23 @@ export default function App() {
             <TripFinderFlow
               onSearch={handleSearch}
               onBack={() => navigate('home')}
+              initialBenefits={tripInput.benefits}
+              welfareProfile={tripInput.welfareProfile}
+            />
+          )}
+          {screen === 'benefit-finder' && (
+            <BenefitFinderScreen
+              initialProfile={welfareProfile}
+              onComplete={handleFindBenefits}
+              onBack={() => navigate('home')}
+            />
+          )}
+          {screen === 'benefit-results' && (
+            <BenefitResultsScreen
+              profile={welfareProfile}
+              matches={benefitMatches}
+              onContinue={handleContinueWithBenefits}
+              onBack={goBack}
             />
           )}
           {screen === 'results' && (
@@ -322,6 +373,8 @@ export default function App() {
               onLogin={handleLogin}
               onLogout={handleLogout}
               navigate={navigate}
+              benefits={tripInput.benefits}
+              onFindBenefits={() => navigate('benefit-finder')}
             />
           )}
           {screen === 'guide' && (

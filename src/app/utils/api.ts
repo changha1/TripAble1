@@ -1,4 +1,12 @@
-import type { TripInput, Place, TripPlan } from '../components/types';
+import type {
+  BenefitDefinition,
+  BenefitEligibilityMatch,
+  Place,
+  TripInput,
+  TripPlan,
+  UserBenefit,
+  WelfareProfile,
+} from '../components/types';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -21,6 +29,24 @@ export async function searchPlaces(input: TripInput): Promise<{ results: Place[]
   });
   if (!res.ok) throw new Error('검색 요청 중 오류 발생');
   return res.json();
+}
+
+export async function getBenefits(): Promise<BenefitDefinition[]> {
+  const res = await fetch(`${API_BASE_URL}/benefits`);
+  if (!res.ok) throw new Error('여행복지 목록을 불러오지 못했습니다.');
+  const data = await res.json();
+  return data.benefits;
+}
+
+export async function findEligibleBenefits(profile: WelfareProfile): Promise<BenefitEligibilityMatch[]> {
+  const res = await fetch(`${API_BASE_URL}/benefits/eligibility`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile),
+  });
+  if (!res.ok) throw new Error('여행복지 대상 후보를 찾지 못했습니다.');
+  const data = await res.json();
+  return data.matches;
 }
 
 export async function getPlaceDetail(id: string): Promise<{ detail: any; images: string[]; subDetails: string[] }> {
@@ -55,6 +81,9 @@ export async function saveTripPlanApi(userId: string, plan: TripPlan) {
     totalVoucherAmount: plan.totalVoucherAmount,
     totalSelfPay: plan.totalSelfPay,
     remainingBalance: plan.remainingBalance,
+    totalDiscountAmount: plan.totalDiscountAmount || 0,
+    totalVoucherCovered: plan.totalVoucherCovered || plan.totalVoucherAmount,
+    benefitSummary: plan.benefitSummary || [],
     places: plan.places.map((p, idx) => ({
       placeId: p.id,
       visitOrder: idx + 1,

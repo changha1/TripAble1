@@ -2,6 +2,7 @@ import { VoucherMatcher } from './services/voucher.matcher.js';
 import { RecommendScorer } from './services/recommend.scorer.js';
 import { TripInput } from './types/index.js';
 import { TourItem } from './services/tour.interface.js';
+import { BENEFIT_CATALOG } from './data/benefits.js';
 
 // 임의의 Tour API 응답
 const testItems: TourItem[] = [
@@ -43,16 +44,7 @@ const testItems: TourItem[] = [
 ];
 
 const testInput: TripInput = {
-  voucher: {
-    id: 'munhwa-nuri',
-    name: '문화누리카드',
-    color: '#16a34a',
-    maxAmount: 130000,
-    benefitType: 'balance',
-    description: '문화누리카드'
-  },
-  balance: 50000,
-  endDate: '2026-12-31',
+  benefits: [{ benefitId: 'munhwa-nuri', enabled: true, owned: true, balance: 50000 }],
   region: '서울',
   startDate: '2026-08-10',
   duration: 'day',
@@ -88,7 +80,7 @@ function runTests() {
 
   // 2. RecommendScorer 필터링 및 점수화 테스트
   console.log('\n--- 2. RecommendScorer Tests ---');
-  const filtered = RecommendScorer.filterItems(testItems, testInput, (item) => matcher.match(item, 'munhwa-nuri'));
+  const filtered = RecommendScorer.filterItems(testItems, testInput, (item) => matcher.matchBenefits(item, testInput, BENEFIT_CATALOG));
   console.log(`필터링 후 개수 (기대: 미등록 분식점은 unavailable이므로 통과 / 또는 예산 범위 대조):`);
   console.log(`-> filtered count: ${filtered.length} (기대: 2개 - 경복궁, 도담)`);
   

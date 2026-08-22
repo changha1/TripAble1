@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Share2, Download, Copy, Star, MapPin, Check, AlertTriangle, CreditCard } from 'lucide-react';
 import type { TripPlan, Place } from './types';
 import { voucherStatusConfig } from './types';
+import { findBenefit } from '../data/benefits';
 
 interface TripPlanScreenProps {
   plan: TripPlan;
@@ -61,7 +62,7 @@ function PlacePlanCard({ place, index, onClick }: { place: Place; index: number;
           </p>
         </div>
         <div className="text-center">
-          <p className="text-gray-400" style={{ fontSize: '0.65rem' }}>바우처 차감</p>
+          <p className="text-gray-400" style={{ fontSize: '0.65rem' }}>혜택 차감</p>
           <p className="text-green-600" style={{ fontWeight: 700, fontSize: '0.82rem' }}>
             -{(place.entryFee - place.selfPay).toLocaleString()}원
           </p>
@@ -131,7 +132,7 @@ export function TripPlanScreen({ plan, onSave, onBack, onSelectPlace }: TripPlan
           {/* Cost overview */}
           <div className="grid grid-cols-3 gap-3 mt-4">
             <div className="bg-white/15 rounded-xl p-3 text-center">
-              <p className="text-green-200" style={{ fontSize: '0.68rem' }}>바우처 사용</p>
+              <p className="text-green-200" style={{ fontSize: '0.68rem' }}>금액형 혜택</p>
               <p className="text-white" style={{ fontWeight: 800, fontSize: '1rem' }}>
                 {plan.totalVoucherAmount.toLocaleString()}원
               </p>
@@ -160,7 +161,7 @@ export function TripPlanScreen({ plan, onSave, onBack, onSelectPlace }: TripPlan
               <div>
                 <p className="text-amber-800" style={{ fontWeight: 700, fontSize: '0.85rem' }}>확인이 필요한 항목이 있습니다</p>
                 <p className="text-amber-600 mt-1" style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>
-                  일부 장소는 바우처 이용 조건을 사전에 확인하셔야 합니다. 방문 전 해당 시설에 전화하시기 바랍니다.
+                  일부 장소는 여행복지 이용 조건을 사전에 확인하셔야 합니다. 방문 전 해당 시설에 전화하시기 바랍니다.
                 </p>
               </div>
             </div>
@@ -170,9 +171,9 @@ export function TripPlanScreen({ plan, onSave, onBack, onSelectPlace }: TripPlan
             <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
               <CreditCard className="w-5 h-5 text-red-400 flex-none mt-0.5" />
               <div>
-                <p className="text-red-700" style={{ fontWeight: 700, fontSize: '0.85rem' }}>바우처 사용 불가 장소 포함</p>
+                <p className="text-red-700" style={{ fontWeight: 700, fontSize: '0.85rem' }}>여행복지 사용 불가 장소 포함</p>
                 <p className="text-red-500 mt-1" style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>
-                  일부 장소는 현재 선택된 바우처로 이용이 불가합니다. 해당 장소는 개인 비용으로 부담됩니다.
+                  일부 장소는 현재 선택된 여행복지로 이용이 불가합니다. 해당 장소는 개인 비용으로 부담됩니다.
                 </p>
               </div>
             </div>
@@ -206,11 +207,17 @@ export function TripPlanScreen({ plan, onSave, onBack, onSelectPlace }: TripPlan
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500" style={{ fontSize: '0.85rem' }}>바우처 사용 예상액</span>
+                <span className="text-gray-500" style={{ fontSize: '0.85rem' }}>금액형 혜택 사용 예상액</span>
                 <span className="text-green-600" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
                   -{plan.totalVoucherAmount.toLocaleString()}원
                 </span>
               </div>
+              {(plan.totalDiscountAmount || 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500" style={{ fontSize: '0.85rem' }}>자격형 할인 예상액</span>
+                  <span className="text-green-600" style={{ fontWeight: 600, fontSize: '0.85rem' }}>-{(plan.totalDiscountAmount || 0).toLocaleString()}원</span>
+                </div>
+              )}
               <div className="border-t border-gray-100 pt-2 flex justify-between">
                 <span className="text-gray-800" style={{ fontWeight: 700, fontSize: '0.9rem' }}>본인부담 합계</span>
                 <span className={`${plan.totalSelfPay === 0 ? 'text-green-600' : 'text-gray-900'}`}
@@ -225,6 +232,19 @@ export function TripPlanScreen({ plan, onSave, onBack, onSelectPlace }: TripPlan
                 </span>
               </div>
             </div>
+            {plan.benefitSummary && plan.benefitSummary.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <p className="text-gray-500 mb-2" style={{ fontSize: '0.75rem', fontWeight: 700 }}>혜택별 사용 내역</p>
+                <div className="space-y-1.5">
+                  {plan.benefitSummary.map(summary => (
+                    <div key={summary.benefitId} className="flex justify-between text-gray-600" style={{ fontSize: '0.75rem' }}>
+                      <span>{findBenefit(summary.benefitId)?.name || summary.benefitId}</span>
+                      <span>{summary.usedAmount.toLocaleString()}원 사용</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="h-4" />

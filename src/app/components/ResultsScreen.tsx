@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { Place, TripInput, Screen } from './types';
 import { voucherStatusConfig, type VoucherStatus } from './types';
+import { findBenefit } from '../data/benefits';
 
 interface ResultsScreenProps {
   results: Place[];
@@ -176,11 +177,11 @@ function InputSummaryBar({ input }: { input: TripInput }) {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          {input.voucher && (
-            <span className="bg-green-100 text-green-700 rounded-full px-2 py-0.5" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
-              {input.voucher.name}
+          {input.benefits.map(benefit => (
+            <span key={benefit.benefitId} className="bg-green-100 text-green-700 rounded-full px-2 py-0.5" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
+              {findBenefit(benefit.benefitId)?.name || benefit.benefitId}
             </span>
-          )}
+          ))}
           {input.region && (
             <span className="bg-white text-gray-600 rounded-full px-2 py-0.5 border border-gray-200" style={{ fontSize: '0.7rem' }}>
               📍 {input.region}
@@ -200,7 +201,7 @@ function InputSummaryBar({ input }: { input: TripInput }) {
       {expanded && (
         <div className="mt-3 grid grid-cols-2 gap-2">
           {[
-            { label: '잔액', value: input.balance > 0 ? `${input.balance.toLocaleString()}원` : '미입력' },
+            { label: '보유 혜택', value: input.benefits.length > 0 ? `${input.benefits.length}개 등록` : '미등록' },
             { label: '기간', value: input.duration === 'day' ? '당일치기' : '1박2일' },
             { label: '본인부담', value: input.selfPayBudget === 0 ? '없음' : `최대 ${input.selfPayBudget.toLocaleString()}원` },
             { label: '관광 유형', value: input.tourismTypes.length > 0 ? `${input.tourismTypes.length}개 선택` : '전체' },

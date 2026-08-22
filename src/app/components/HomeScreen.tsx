@@ -5,6 +5,7 @@ import { voucherStatusConfig } from './types';
 
 interface HomeScreenProps {
   onFindTrip: () => void;
+  onFindBenefits: () => void;
   onSelectPlace: (place: Place) => void;
   navigate: (screen: Screen) => void;
   isLoggedIn: boolean;
@@ -44,7 +45,7 @@ function PlaceCard({ place, onClick }: { place: Place; onClick: () => void }) {
   );
 }
 
-export function HomeScreen({ onFindTrip, onSelectPlace, navigate, isLoggedIn, favorites }: HomeScreenProps) {
+export function HomeScreen({ onFindTrip, onFindBenefits, onSelectPlace, navigate, isLoggedIn, favorites }: HomeScreenProps) {
   const featuredPlaces = MOCK_PLACES.filter(p => p.voucherStatus === 'available').slice(0, 4);
   const recentPlaces = MOCK_PLACES.slice(0, 3);
 
@@ -58,7 +59,7 @@ export function HomeScreen({ onFindTrip, onSelectPlace, navigate, isLoggedIn, fa
               {isLoggedIn ? '안녕하세요! 👋' : '환영합니다'}
             </p>
             <h2 className="text-white" style={{ fontWeight: 700, fontSize: '1.2rem' }}>
-              {isLoggedIn ? '오늘도 좋은 여행 되세요' : '내 바우처로 여행 찾기'}
+              {isLoggedIn ? '오늘도 좋은 여행 되세요' : '내 조건으로 가능한 여행 찾기'}
             </h2>
           </div>
           <button
@@ -71,15 +72,15 @@ export function HomeScreen({ onFindTrip, onSelectPlace, navigate, isLoggedIn, fa
 
         {/* Main CTA */}
         <button
-          onClick={onFindTrip}
+          onClick={onFindBenefits}
           className="w-full bg-white rounded-2xl px-4 py-4 flex items-center gap-3 shadow-lg active:scale-95 transition-transform"
         >
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
             <Search className="w-5 h-5 text-green-700" />
           </div>
           <div className="text-left flex-1">
-            <p className="text-green-700" style={{ fontWeight: 700, fontSize: '0.9rem' }}>맞춤 여행 찾기</p>
-            <p className="text-gray-400" style={{ fontSize: '0.75rem' }}>바우처·지역·편의조건으로 검색</p>
+            <p className="text-green-700" style={{ fontWeight: 700, fontSize: '0.9rem' }}>나에게 맞는 여행복지 찾기</p>
+            <p className="text-gray-400" style={{ fontSize: '0.75rem' }}>내 조건으로 받을 수 있는 지원과 할인 확인</p>
           </div>
           <ChevronRight className="w-5 h-5 text-gray-300" />
         </button>
@@ -109,7 +110,7 @@ export function HomeScreen({ onFindTrip, onSelectPlace, navigate, isLoggedIn, fa
           <div className="flex items-start gap-3">
             <CreditCard className="w-5 h-5 text-green-600 flex-none mt-0.5" />
             <div className="flex-1">
-              <p className="text-green-800" style={{ fontWeight: 600, fontSize: '0.85rem' }}>지원 바우처 안내</p>
+              <p className="text-green-800" style={{ fontWeight: 600, fontSize: '0.85rem' }}>여행복지 안내</p>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {VOUCHERS.map(v => (
                   <span
@@ -131,7 +132,7 @@ export function HomeScreen({ onFindTrip, onSelectPlace, navigate, isLoggedIn, fa
         {/* Featured available places */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-gray-800" style={{ fontWeight: 700, fontSize: '1rem' }}>바우처 이용 가능 추천 장소</h3>
+            <h3 className="text-gray-800" style={{ fontWeight: 700, fontSize: '1rem' }}>여행복지 이용 가능 추천 장소</h3>
             <button onClick={() => navigate('results')} className="text-green-600 flex items-center gap-0.5" style={{ fontSize: '0.78rem' }}>
               전체보기 <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -148,9 +149,9 @@ export function HomeScreen({ onFindTrip, onSelectPlace, navigate, isLoggedIn, fa
           <div className="flex items-start gap-2">
             <span style={{ fontSize: '1rem' }}>⚠️</span>
             <div>
-              <p className="text-amber-800" style={{ fontWeight: 600, fontSize: '0.82rem' }}>바우처 이용 전 확인사항</p>
+              <p className="text-amber-800" style={{ fontWeight: 600, fontSize: '0.82rem' }}>여행복지 이용 전 확인사항</p>
               <p className="text-amber-700 mt-1" style={{ fontSize: '0.75rem', lineHeight: 1.6 }}>
-                바우처 이용 가능 여부는 변경될 수 있습니다.
+                여행복지 이용 가능 여부는 변경될 수 있습니다.
                 방문 전 해당 시설에 직접 전화하여 확인하시기 바랍니다.
               </p>
             </div>

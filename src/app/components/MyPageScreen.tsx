@@ -1,11 +1,14 @@
 import { ChevronRight, LogIn, LogOut, User, CreditCard, Bookmark, Heart, Bell, Shield, HelpCircle, Info } from 'lucide-react';
-import type { Screen } from './types';
+import type { Screen, UserBenefit } from './types';
+import { findBenefit } from '../data/benefits';
 
 interface MyPageScreenProps {
   isLoggedIn: boolean;
   onLogin: () => void;
   onLogout: () => void;
   navigate: (screen: Screen) => void;
+  benefits: UserBenefit[];
+  onFindBenefits: () => void;
 }
 
 function MenuItem({ icon, label, desc, onClick, badge }: {
@@ -45,7 +48,7 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-export function MyPageScreen({ isLoggedIn, onLogin, onLogout, navigate }: MyPageScreenProps) {
+export function MyPageScreen({ isLoggedIn, onLogin, onLogout, navigate, benefits, onFindBenefits }: MyPageScreenProps) {
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-y-auto">
       {/* Profile area */}
@@ -79,7 +82,7 @@ export function MyPageScreen({ isLoggedIn, onLogin, onLogout, navigate }: MyPage
             </div>
             <p className="text-gray-600" style={{ fontWeight: 600, fontSize: '0.95rem' }}>로그인이 필요합니다</p>
             <p className="text-gray-400 mt-1 mb-4" style={{ fontSize: '0.8rem' }}>
-              로그인하면 바우처 정보 저장, 맞춤 추천 등을 이용할 수 있습니다.
+              로그인하면 여행복지 정보 저장, 맞춤 추천 등을 이용할 수 있습니다.
             </p>
             <button
               onClick={onLogin}
@@ -96,35 +99,31 @@ export function MyPageScreen({ isLoggedIn, onLogin, onLogout, navigate }: MyPage
         )}
       </div>
 
-      {/* My vouchers */}
-      {isLoggedIn && (
-        <>
-          <SectionHeader title="내 바우처" />
+      {/* My travel welfare */}
+      <>
+          <SectionHeader title="내 여행복지" />
           <div className="bg-white">
             <div className="px-5 py-4">
-              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center flex-none">
-                  <CreditCard className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-gray-800" style={{ fontWeight: 700, fontSize: '0.9rem' }}>문화누리카드</p>
-                  <p className="text-gray-500" style={{ fontSize: '0.75rem' }}>2026년 12월 31일 만료</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-500 rounded-full" style={{ width: '54%' }} />
-                    </div>
-                    <span className="text-green-600" style={{ fontWeight: 700, fontSize: '0.78rem' }}>70,000원 남음</span>
+              {benefits.length > 0 ? benefits.map(benefit => {
+                const definition = findBenefit(benefit.benefitId);
+                if (!definition) return null;
+                const isBalance = definition.category === 'balance';
+                return <div key={benefit.benefitId} className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-2 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-none" style={{ backgroundColor: `${definition.color}20` }}>
+                    <CreditCard className="w-5 h-5" style={{ color: definition.color }} />
                   </div>
-                </div>
-              </div>
-              <button className="w-full mt-3 border-2 border-dashed border-gray-200 rounded-2xl py-3 text-gray-400 flex items-center justify-center gap-2"
-                style={{ fontSize: '0.82rem' }}>
-                + 바우처 추가
+                  <div className="flex-1">
+                    <p className="text-gray-800" style={{ fontWeight: 700, fontSize: '0.86rem' }}>{definition.name}</p>
+                    <p className="text-gray-500" style={{ fontSize: '0.72rem' }}>{isBalance ? `${(benefit.balance || 0).toLocaleString()}원 남음` : '시설별 적용 여부 확인 필요'}</p>
+                  </div>
+                </div>;
+              }) : <p className="text-gray-500 py-2" style={{ fontSize: '0.8rem' }}>등록한 여행복지가 없습니다.</p>}
+              <button onClick={onFindBenefits} className="w-full mt-2 border-2 border-dashed border-gray-200 rounded-2xl py-3 text-gray-400 flex items-center justify-center gap-2" style={{ fontSize: '0.82rem' }}>
+                + 여행복지 추가
               </button>
             </div>
           </div>
-        </>
-      )}
+      </>
 
       {/* My activity */}
       <SectionHeader title="내 활동" />
@@ -176,7 +175,7 @@ export function MyPageScreen({ isLoggedIn, onLogin, onLogout, navigate }: MyPage
       <div className="px-5 py-8 text-center">
         <p className="text-green-600" style={{ fontWeight: 700, fontSize: '0.9rem' }}>TripAble</p>
         <p className="text-gray-400 mt-1" style={{ fontSize: '0.72rem' }}>
-          복지 바우처로 떠나는 맞춤 여행 서비스
+          여행복지로 떠나는 맞춤 여행 서비스
         </p>
         <p className="text-gray-300 mt-3" style={{ fontSize: '0.68rem' }}>
           관광 정보 출처: 한국관광공사 TourAPI<br />

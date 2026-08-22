@@ -1,5 +1,5 @@
 export interface RecommendWeights {
-  voucher: number;        // w1: 바우처 이용 편의 및 신뢰도
+  benefit: number;        // w1: 여행복지 이용 편의 및 신뢰도
   budget: number;         // w2: 예산 적합성 (잔액 내 결제 비율)
   preference: number;     // w3: 사용자 선호 카테고리 매칭
   distance: number;       // w4: 이동 수단 및 대중교통/거리 최적화
@@ -10,7 +10,7 @@ export interface RecommendWeights {
 
 // 기본 추천 알고리즘 가중치 설정 (가중치의 합은 1.0 권장)
 export const RECOMMEND_WEIGHTS: RecommendWeights = {
-  voucher: 0.25,       // 바우처 가용성이 가장 중요함
+  benefit: 0.25,        // 여행복지 가용성이 가장 중요함
   budget: 0.20,        // 본인부담 최소화
   preference: 0.15,    // 선호 관광유형 매칭
   accessibility: 0.15, // 배리어프리 편의조건

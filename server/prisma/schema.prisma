@@ -12,6 +12,7 @@ model User {
   email     String     @unique
   favorites Favorite[]
   plans     TripPlan[]
+  benefits  UserBenefit[]
   createdAt DateTime   @default(now())
 }
 
@@ -33,10 +34,38 @@ model TripPlan {
   travelDate         String
   duration           String          // 'day' | 'overnight'
   totalVoucherAmount Int
+  totalDiscountAmount Int @default(0)
+  totalVoucherCovered Int @default(0)
   totalSelfPay       Int
   remainingBalance   Int
   createdAt          DateTime        @default(now())
   places             TripPlanPlace[]
+  benefitSummary     TripPlanBenefit[]
+}
+
+model UserBenefit {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  benefitId String
+  enabled   Boolean  @default(true)
+  owned     Boolean  @default(false)
+  balance   Int?
+  expiresAt String?
+  priority  Int?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, benefitId])
+}
+
+model TripPlanBenefit {
+  id              String   @id @default(uuid())
+  tripPlanId      String
+  plan            TripPlan @relation(fields: [tripPlanId], references: [id], onDelete: Cascade)
+  benefitId       String
+  usedAmount      Int      @default(0)
+  remainingAmount Int?
+  discountAmount  Int      @default(0)
 }
 
 model TripPlanPlace {

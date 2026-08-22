@@ -1,7 +1,8 @@
 import { TourItem } from './tour.interface.js';
-import { Place, TripInput, AccessibilityInfo, VoucherStatus } from '../types/index.js';
+import { BenefitApplication, BenefitStatus, Place, TripInput, AccessibilityInfo } from '../types/index.js';
 import { RECOMMEND_WEIGHTS } from '../config/recommend.config.js';
 import { BudgetCalculator, BudgetCost } from './budget.calculator.js';
+import { BENEFIT_CATALOG } from '../data/benefits.js';
 
 export class RecommendScorer {
   /**
@@ -14,9 +15,9 @@ export class RecommendScorer {
   public static filterItems(
     items: TourItem[],
     input: TripInput,
-    matchFn: (item: TourItem) => { status: VoucherStatus; detail: string; verifiedDate: string }
-  ): { item: TourItem; status: VoucherStatus; detail: string; cost: BudgetCost; verifiedDate: string }[] {
-    const filtered: { item: TourItem; status: VoucherStatus; detail: string; cost: BudgetCost; verifiedDate: string }[] = [];
+    matchFn: (item: TourItem) => BenefitApplication[]
+  ): { item: TourItem; applications: BenefitApplication[]; cost: BudgetCost; verifiedDate: string }[] {
+    const filtered: { item: TourItem; applications: BenefitApplication[]; cost: BudgetCost; verifiedDate: string }[] = [];
 
     for (const item of items) {
       // 1. 지역 필터링 (검색 시 지역을 입력한 경우)
@@ -25,13 +26,13 @@ export class RecommendScorer {
       }
 
       // 2. 바우처 매칭 상태 및 비용 분석
-      const matchResult = matchFn(item);
+      const applications = matchFn(item);
       
       // 목업 가격/입장료 파싱 (상세정보 혹은 임의 매핑)
       // 경복궁(3000), 국립중앙박물관(0), 한국민속촌(25000), 천지연폭포(2000), 부산해운대(0), 전주경기전(3000), 고궁음악회(10000), 유스호스텔(60000), 도담(15000), 현대미술관(4000)
       const rawPrice = this.getMockEntryFee(item.contentid);
       
-      const cost = BudgetCalculator.calculatePlaceCost(rawPrice, matchResult.status, input.balance);
+      const cost = BudgetCalculator.calculateMultiBenefitCost(rawPrice, applications, BENEFIT_CATALOG, input.benefits);
 
       // 3. 예산 필터링 (본인부담금이 예산을 초과하는지 여부)
       if (cost.isPriceConfirmed && input.selfPayBudget !== undefined) {
@@ -61,10 +62,9 @@ export class RecommendScorer {
 
       filtered.push({
         item,
-        status: matchResult.status,
-        detail: matchResult.detail,
+        applications: cost.applications,
         cost,
-        verifiedDate: matchResult.verifiedDate
+        verifiedDate: applications.map(application => application.verifiedDate).filter(Boolean).sort().at(-1) || 'N/A'
       });
     }
 
@@ -75,13 +75,15 @@ export class RecommendScorer {
    * 필터링된 장소들에 대해 점수를 계산하고 정렬합니다. (2단계 & 3단계)
    */
   public static scoreAndNormalize(
-    filteredItems: { item: TourItem; status: VoucherStatus; detail: string; cost: BudgetCost; verifiedDate: string }[],
+    filteredItems: { item: TourItem; applications: BenefitApplication[]; cost: BudgetCost; verifiedDate: string }[],
     input: TripInput
   ): Place[] {
     const scoredPlaces: { place: Place; score: number }[] = [];
 
     for (const entry of filteredItems) {
-      const { item, status, detail, cost, verifiedDate } = entry;
+      const { item, applications, cost, verifiedDate } = entry;
+      const status = this.getOverallStatus(applications);
+      const detail = applications.length > 0 ? applications.map(application => application.detail).join(' ') : '등록한 여행복지 혜택이 없어 일반 관광정보로 확인합니다.';
 
       // 각 서브스코어 계산 (0 ~ 1 범위)
       const sVoucher = this.calcVoucherScore(status);
@@ -94,7 +96,7 @@ export class RecommendScorer {
 
       // 가중합 계산
       const totalScore = 
-        RECOMMEND_WEIGHTS.voucher * sVoucher +
+        RECOMMEND_WEIGHTS.benefit * sVoucher +
         RECOMMEND_WEIGHTS.budget * sBudget +
         RECOMMEND_WEIGHTS.preference * sPreference +
         RECOMMEND_WEIGHTS.distance * sDistance +
@@ -122,6 +124,9 @@ export class RecommendScorer {
         image: item.firstimage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800',
         rating: this.getMockRating(item.contentid),
         reviewCount: this.getMockReviewCount(item.contentid),
+        overallBenefitStatus: status,
+        benefitApplications: applications,
+        priceBreakdown: cost.priceBreakdown,
         voucherStatus: status,
         voucherStatusDetail: detail,
         entryFee: cost.entryFee,
@@ -147,8 +152,15 @@ export class RecommendScorer {
     return scoredPlaces.sort((a, b) => b.score - a.score).map(x => x.place);
   }
 
+  private static getOverallStatus(applications: BenefitApplication[]): BenefitStatus {
+    if (applications.some(application => application.status === 'available')) return 'available';
+    if (applications.some(application => application.status === 'conditional')) return 'conditional';
+    if (applications.some(application => application.status === 'check')) return 'check';
+    return applications.length > 0 ? 'unavailable' : 'check';
+  }
+
   // 바우처 적합도 (Available 우선)
-  private static calcVoucherScore(status: VoucherStatus): number {
+  private static calcVoucherScore(status: BenefitStatus): number {
     switch (status) {
       case 'available': return 1.0;
       case 'conditional': return 0.7;
@@ -244,7 +256,7 @@ export class RecommendScorer {
     sBudget: number;
     sPreference: number;
     sAccessibility: number;
-    status: VoucherStatus;
+    status: BenefitStatus;
     cost: BudgetCost;
     title: string;
     tourismTypes: string[];
@@ -312,7 +324,7 @@ export class RecommendScorer {
       '9': { wheelchair: true, disabledToilet: false, disabledParking: false, elevator: false, babyFacility: false, seniorFriendly: true, restArea: false },
       '10': { wheelchair: true, disabledToilet: true, disabledParking: true, elevator: true, babyFacility: true, seniorFriendly: true, restArea: true }
     };
-    return mockDb[id] || { wheelchair: false, disabledToilet: false, disabledParking: false, elevator: false, babyFacility: false, seniorFriendly: false, restArea: false };
+    return mockDb[id] || { wheelchair: null, disabledToilet: null, disabledParking: null, elevator: null, babyFacility: null, seniorFriendly: null, restArea: null };
   }
 
   private static mapAccessibilityKey(cond: string): keyof AccessibilityInfo | null {
